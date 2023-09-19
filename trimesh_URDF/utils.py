@@ -1,11 +1,13 @@
 import copy
 import numpy as np
 import trimesh
+import sys
 from .src import (
     URDFParser,
     URDFTree,
     SceneGraph,
 )
+
 
 # Sample Points from trimesh.Scene, different point number for different geometry based on the area ratio. The number of points is not strict, just oversample
 def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
@@ -17,6 +19,14 @@ def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
     points = []
     colors = []
     normals = []
+    scene_face_indexes = np.array([], dtype=int)
+    barycentric_coordinates = np.empty((1, 3))
+    geometry_map = np.array([])
+    
+    all_triangles = trimesh_scene.triangles
+    triangle_to_key_map = trimesh_scene.triangles_node
+    
+    #print(trimesh_scene.graph.geometry_nodes)
 
     # Get the points from the geometries in the trimesh.Scene
     for key, geometry in trimesh_scene.geometry.items():
@@ -27,22 +37,31 @@ def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
         # Check the number of points based on the area ratio of the whole trimesh scene, make sure there are some samples for each geometry
         num_geo_points = max(int(geometry.area / trimesh_scene.area * num_points), 500)
         # Some geometry may not have texture uv
+
         if geometry.visual.uv is None or geometry.visual.material.image is None:
             result = trimesh.sample.sample_surface(geometry, num_geo_points, sample_color=False)
             colors.append(np.array([geometry.visual.material.main_color[:3] / 255] * num_geo_points))
         else:
             result = trimesh.sample.sample_surface(geometry, num_geo_points, sample_color=True)
             colors.append(np.array(result[2])[:, :3] / 255)
+
         points.append(np.array(result[0]))
         normals.append(geometry.face_normals[result[1]])
+        face_indexes = np.array(result[1], dtype=int)
+            
+        triangles = geometry.vertices[geometry.faces[face_indexes]]
+        scene_face_indexes = np.append(scene_face_indexes, face_indexes)
+        barycentric_coordinates = np.append(barycentric_coordinates, trimesh.triangles.points_to_barycentric(triangles, result[0]), axis=0)
+        geometry_map = np.append(geometry_map, [key] * len(result[0]))
+
     
     # Concatenate the array
     points = np.concatenate(points, axis=0)
     colors = np.concatenate(colors, axis=0)
     normals = np.concatenate(normals, axis=0)
     
-
-    return points, colors, normals
+    
+    return points, colors, normals, scene_face_indexes, np.delete(barycentric_coordinates, 0, 0), geometry_map
 
 # Load the URDF into trimesh, return the urdf and controller
 # JointInfo: whether to print all the joint information
