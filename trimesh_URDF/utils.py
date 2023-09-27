@@ -10,7 +10,7 @@ from .src import (
 
 
 # Sample Points from trimesh.Scene, different point number for different geometry based on the area ratio. The number of points is not strict, just oversample
-def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
+def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points, part_name):
     geo_trans_mapping = {}
     # Get the mapping between the geometry key and its corresponding transformation
     for key in trimesh_scene.graph.nodes_geometry:
@@ -29,6 +29,7 @@ def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
     #print(trimesh_scene.graph.geometry_nodes)
 
     # Get the points from the geometries in the trimesh.Scene
+
     for key, geometry in trimesh_scene.geometry.items():
         # Need to deepcopy, or it will influence the original mesh
         geometry = copy.deepcopy(geometry)
@@ -52,14 +53,14 @@ def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
         triangles = geometry.vertices[geometry.faces[face_indexes]]
         scene_face_indexes = np.append(scene_face_indexes, face_indexes)
         barycentric_coordinates = np.append(barycentric_coordinates, trimesh.triangles.points_to_barycentric(triangles, result[0]), axis=0)
-        geometry_map = np.append(geometry_map, [key] * len(result[0]))
+        geometry_map = np.append(geometry_map, [part_name + key] * len(result[0]))
 
-    
+
+
     # Concatenate the array
     points = np.concatenate(points, axis=0)
     colors = np.concatenate(colors, axis=0)
     normals = np.concatenate(normals, axis=0)
-    
     
     return points, colors, normals, scene_face_indexes, np.delete(barycentric_coordinates, 0, 0), geometry_map
 
