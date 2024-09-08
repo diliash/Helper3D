@@ -10,6 +10,7 @@ def getMotionMesh(motion_type, axis, origin, axis_color=[1, 0.84, 0], origin_col
     mesh.append(getArrowMesh(origin, origin + axis, color=axis_color))
     return mesh
 
+
 def getSphereMesh(center, radius=0.1, color=[0, 0, 0]):
     sphere = o3d.geometry.TriangleMesh.create_sphere(radius=radius).translate(center)
     sphere.paint_uniform_color(color)
@@ -54,9 +55,9 @@ def getArrowMesh(origin=[0, 0, 0], end=None, color=[0, 0, 0]):
     vec_len = np.linalg.norm(vec_Arr)
     mesh_arrow = o3d.geometry.TriangleMesh.create_arrow(
         cone_height=0.2 * vec_len,
-        cone_radius=0.08,
-        cylinder_height=1.0 * vec_len,
-        cylinder_radius=0.04,
+        cone_radius=0.05,
+        cylinder_height=0.6 * vec_len,
+        cylinder_radius=0.02,
     )
     mesh_arrow.paint_uniform_color(color)
     rot_mat = _caculate_align_mat(vec_Arr / vec_len)

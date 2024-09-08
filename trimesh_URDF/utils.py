@@ -1,16 +1,14 @@
 import copy
+import sys
+
 import numpy as np
 import trimesh
-import sys
-from .src import (
-    URDFParser,
-    URDFTree,
-    SceneGraph,
-)
+
+from .src import SceneGraph, URDFParser, URDFTree
 
 
 # Sample Points from trimesh.Scene, different point number for different geometry based on the area ratio. The number of points is not strict, just oversample
-def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points, part_name):
+def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points):
     geo_trans_mapping = {}
     # Get the mapping between the geometry key and its corresponding transformation
     for key in trimesh_scene.graph.nodes_geometry:
@@ -36,15 +34,24 @@ def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points, part_name):
         # Take the scene transformation into account
         geometry.apply_transform(np.dot(trimesh_scene.graph["world"][0], geo_trans_mapping[key]))
         # Check the number of points based on the area ratio of the whole trimesh scene, make sure there are some samples for each geometry
-        num_geo_points = max(int(geometry.area / trimesh_scene.area * num_points), 500)
+        num_geo_points = max(int(geometry.area / trimesh_scene.area * num_points), int(num_points / len(trimesh_scene.geometry)))
         # Some geometry may not have texture uv
 
-        if geometry.visual.uv is None or geometry.visual.material.image is None:
+        #print(geometry.visual.uv, geometry.visual.material, isinstance(geometry.visual.material, trimesh.visual.material.PBRMaterial))
+        if not isinstance(geometry.visual, trimesh.visual.color.ColorVisuals):
+            if isinstance(geometry.visual.material, trimesh.visual.material.PBRMaterial):
+                geometry.visual.material = geometry.visual.material.to_simple()
+        #print(geometry.visual.uv, geometry.visual.material, isinstance(geometry.visual.material, trimesh.visual.material.PBRMaterial))
+        if isinstance(geometry.visual, trimesh.visual.color.ColorVisuals):
             result = trimesh.sample.sample_surface(geometry, num_geo_points, sample_color=False)
-            colors.append(np.array([geometry.visual.material.main_color[:3] / 255] * num_geo_points))
+            colors.append(np.array([0.5, 0.5, 0.5] * num_geo_points))
         else:
-            result = trimesh.sample.sample_surface(geometry, num_geo_points, sample_color=True)
-            colors.append(np.array(result[2])[:, :3] / 255)
+            if geometry.visual.uv is None or geometry.visual.material.image is None:
+                result = trimesh.sample.sample_surface(geometry, num_geo_points, sample_color=False)
+                colors.append(np.array([geometry.visual.material.main_color[:3] / 255] * num_geo_points))
+            else:
+                result = trimesh.sample.sample_surface(geometry, num_geo_points, sample_color=True)
+                colors.append(np.array(result[2])[:, :3] / 255)
 
         points.append(np.array(result[0]))
         normals.append(geometry.face_normals[result[1]])
@@ -53,9 +60,7 @@ def SampleSurfaceFromTrimeshScene(trimesh_scene, num_points, part_name):
         triangles = geometry.vertices[geometry.faces[face_indexes]]
         scene_face_indexes = np.append(scene_face_indexes, face_indexes)
         barycentric_coordinates = np.append(barycentric_coordinates, trimesh.triangles.points_to_barycentric(triangles, result[0]), axis=0)
-        geometry_map = np.append(geometry_map, [part_name + key] * len(result[0]))
-
-
+        geometry_map = np.append(geometry_map, [key] * len(result[0]))
 
     # Concatenate the array
     points = np.concatenate(points, axis=0)
